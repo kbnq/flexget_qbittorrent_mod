@@ -23,6 +23,7 @@ except ImportError:
 
 class MainClass(NexusPHP):
     URL: Final = 'https://open.cd/'
+    IGNORE_TITLE = '種子被刪除'
     USER_CLASSES: Final = {
         'downloaded': [644245094400, 3298534883328],
         'share_ratio': [3.5, 5],
@@ -83,6 +84,7 @@ class MainClass(NexusPHP):
                     'imagestring': (None, code)
                 }
                 return self.request(entry, 'post', work.url, files=data, params=params)
+        return None
 
     @property
     def details_selector(self) -> dict:
@@ -97,3 +99,6 @@ class MainClass(NexusPHP):
             }
         })
         return selector
+
+    def get_messages(self, entry: SignInEntry, config: dict) -> None:
+        self.get_nexusphp_messages(entry, config, ignore_title=self.IGNORE_TITLE)

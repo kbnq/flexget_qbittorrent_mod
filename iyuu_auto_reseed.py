@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import hashlib
 import time
@@ -29,7 +31,7 @@ def update_header_cookie(entry: Entry, headers: dict, task: Task) -> None:
         task.requests.cookies.clear()
 
 
-def get_qbittorrent_mod_seeding(client_torrent):
+def get_qbittorrent_mod_seeding(client_torrent: dict) -> bool | None:
     if 'up' in client_torrent['qbittorrent_state'].lower() and 'pause' not in client_torrent[
         'qbittorrent_state'].lower():
         client_torrent['reseed'] = {
@@ -38,24 +40,26 @@ def get_qbittorrent_mod_seeding(client_torrent):
             'category': client_torrent['qbittorrent_category']
         }
         return True
+    return None
 
 
-def to_qbittorrent_mod(entry: Entry, client_torrent) -> None:
+def to_qbittorrent_mod(entry: Entry, client_torrent: dict) -> None:
     entry['savepath'] = client_torrent['reseed'].get('path')
     entry['autoTMM'] = client_torrent['reseed'].get('autoTMM')
     entry['category'] = client_torrent['reseed'].get('category')
     entry['paused'] = 'true'
 
 
-def get_transmission_seeding(client_torrent):
+def get_transmission_seeding(client_torrent: dict) -> dict | None:
     if 'seed' in client_torrent['transmission_status'].lower():
         client_torrent['reseed'] = {
             'path': client_torrent['transmission_downloadDir']
         }
         return client_torrent
+    return None
 
 
-def to_transmission(entry: Entry, client_torrent):
+def to_transmission(entry: Entry, client_torrent: dict) -> None:
     entry['path'] = client_torrent['reseed'].get('path')
     entry['add_paused'] = 'Yes'
 
@@ -79,7 +83,7 @@ def transmission_on_task_download(self, task: Task, config: dict) -> None:
 PluginTransmission.on_task_download = transmission_on_task_download
 
 
-def get_deluge_seeding(client_torrent):
+def get_deluge_seeding(client_torrent: dict):
     if 'seeding' in client_torrent['deluge_state'].lower():
         client_torrent['reseed'] = {
             'path': client_torrent['deluge_save_path'],
@@ -88,13 +92,13 @@ def get_deluge_seeding(client_torrent):
         return client_torrent
 
 
-def to_deluge(entry, client_torrent):
+def to_deluge(entry: Entry, client_torrent: dict) -> None:
     entry['path'] = client_torrent['reseed'].get('path')
     entry['move_completed_path'] = client_torrent['reseed'].get('move_completed_path')
     entry['add_paused'] = 'Yes'
 
 
-def deluge_on_task_download(self, task, config):
+def deluge_on_task_download(self, task: Task, config: dict) -> None:
     config = self.prepare_config(config)
     if not config['enabled']:
         return
@@ -146,7 +150,7 @@ class PluginIYUUAutoReseed:
         'additionalProperties': False
     }
 
-    def prepare_config(self, config):
+    def prepare_config(self, config: dict) -> dict:
         config.setdefault('iyuu', '')
         config.setdefault('version', '1.10.9')
         config.setdefault('limit', 999)
@@ -154,7 +158,7 @@ class PluginIYUUAutoReseed:
         config.setdefault('passkeys', {})
         return config
 
-    def on_task_input(self, task, config):
+    def on_task_input(self, task: Task, config: dict) -> list[Entry]:
         config = self.prepare_config(config)
         passkeys = config.get('passkeys')
         limit = config.get('limit')
@@ -252,7 +256,7 @@ class PluginIYUUAutoReseed:
                         entries.append(entry)
         return entries
 
-    def get_torrents_data(self, result, config, from_client_method):
+    def get_torrents_data(self, result: list, config: dict, from_client_method: callable) -> tuple[dict, dict]:
         torrent_dict = {}
         torrents_hashes = {}
         hashes = []
@@ -276,7 +280,7 @@ class PluginIYUUAutoReseed:
 
         return torrent_dict, torrents_hashes
 
-    def modify_sites(self, sites_json):
+    def modify_sites(self, sites_json: list) -> dict[str, dict]:
         sites_dict = {}
         for site in sites_json:
             site['download_page'] = site['download_page'].replace('{}', '{torrent_id}')
@@ -285,12 +289,12 @@ class PluginIYUUAutoReseed:
             sites_dict[str(site['id'])] = site
         return sites_dict
 
-    def _get_site_name(self, base_url):
+    def _get_site_name(self, base_url: str) -> str:
         domain = base_url.split('.')
         site_name = domain[-2]
         return site_name if site_name != 'edu' else domain[-3]
 
 
 @event('plugin.register')
-def register_plugin():
+def register_plugin() -> None:
     plugin.register(PluginIYUUAutoReseed, 'iyuu_auto_reseed', api_ver=2)
