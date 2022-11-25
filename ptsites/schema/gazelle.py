@@ -9,7 +9,7 @@ from .private_torrent import PrivateTorrent
 from ..base.entry import SignInEntry
 from ..base.request import check_network_state, NetworkState
 from ..utils import net_utils
-from ..utils.value_hanlder import handle_infinite
+from ..utils.value_handler import handle_infinite
 
 
 class Gazelle(PrivateTorrent, ABC):
@@ -42,7 +42,7 @@ class Gazelle(PrivateTorrent, ABC):
                     'regex': (r'(Gold|积分|Bonus|Credits|Nips).*?([\d,.]+)', 2)
                 },
                 'join_date': {
-                    'regex': ('(Joined|加入时间).*?(.*?)(ago|前)', 2),
+                    'regex': ('(Joined|加入时间).*?(.*?)(ago|前|Last seen)', 2),
                     'handle': self.handle_join_date
                 },
                 'seeding': {

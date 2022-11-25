@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from enum import Enum
 
 import requests
@@ -40,8 +41,7 @@ def check_network_state(entry: SignInEntry,
 
 def cf_detected(response: Response) -> bool:
     if response is not None:
-        return response.text.find('<title>Please Wait... | Cloudflare</title>') > 0 or \
-               response.text.find('DDoS protection by <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing/" target="_blank">Cloudflare</a>') > 0
+        return bool(re.search(r'security by.*Cloudflare</a>', response.text, flags=re.DOTALL))
 
 
 class Request:
@@ -66,9 +66,10 @@ class Request:
         try:
             response: Response = self.session.request(method, url, timeout=60, **kwargs)
             if cf_detected(response):
-                entry.fail_with_prefix('Defected CloudFlare DDoS-GUARD')
+                entry.fail_with_prefix('Detected CloudFlare DDoS-GUARD')
             elif response is not None and response.status_code != 200:
                 entry.fail_with_prefix(f'response.status_code={response.status_code}')
+            entry['session_cookie'] = (' '.join(list(map(lambda x: f'{x[0]}={x[1]};', self.session.cookies.items()))))
             return response
         except Exception as e:
             entry.fail_with_prefix(NetworkState.NETWORK_ERROR.value.format(url=url, error=e))

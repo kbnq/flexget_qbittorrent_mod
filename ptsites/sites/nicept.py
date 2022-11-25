@@ -1,9 +1,10 @@
 from typing import Final
 
-from ..schema.nexusphp import Attendance
+from ..base.reseed import ReseedPasskey
+from ..schema.nexusphp import AttendanceHR
 
 
-class MainClass(Attendance):
+class MainClass(AttendanceHR, ReseedPasskey):
     URL: Final = 'https://www.nicept.net/'
     USER_CLASSES: Final = {
         'downloaded': [805306368000, 3298534883328],

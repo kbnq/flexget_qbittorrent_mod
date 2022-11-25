@@ -37,7 +37,7 @@ class QBittorrentClientFactory:
         self.client_map: dict[str, QBittorrentClient] = {}
 
     def get_client(self, config: dict) -> QBittorrentClient:
-        client_key = '{}{}'.format(config.get('host'), config.get('port'))
+        client_key = f"{config.get('host')}{config.get('port')}"
         client = self.client_map.get(client_key)
         if not client:
             with self._client_lock:
@@ -94,7 +94,7 @@ class QBittorrentClient:
             response = self.session.request(method, url, timeout=60, **kwargs)
             if response.status_code == 403 or (self.API_URL_LOGIN in url and response.text == 'Fails.'):
                 msg = (
-                    'Failure. URL: {}, data: {}, status_code: {}'.format(url, kwargs, response.status_code)
+                    f'Failure. URL: {url}, data: {kwargs}, status_code: {response.status_code}'
                     if not msg_on_fail
                     else msg_on_fail
                 )
@@ -105,9 +105,7 @@ class QBittorrentClient:
         except RequestException as e:
             self.reset_rid(reason='RequestException')
             msg = str(e)
-        raise plugin.PluginError(
-            'Error when trying to send request to qbittorrent: {}'.format(msg)
-        )
+        raise plugin.PluginError(f'Error when trying to send request to qbittorrent: {msg}')
 
     def check_api_version(self, msg_on_fail: str) -> None:
         try:
@@ -115,12 +113,10 @@ class QBittorrentClient:
             response = self.session.request('get', url, verify=self._verify)
             if response.status_code != 404:
                 return response
-            msg = 'Failure. URL: {}'.format(url) if not msg_on_fail else msg_on_fail
+            msg = f'Failure. URL: {url}' if not msg_on_fail else msg_on_fail
         except RequestException as e:
             msg = str(e)
-        raise plugin.PluginError(
-            'Error when trying to send request to qbittorrent: {}'.format(msg)
-        )
+        raise plugin.PluginError(f'Error when trying to send request to qbittorrent: {msg}')
 
     def connect(self) -> None:
         """
@@ -131,9 +127,7 @@ class QBittorrentClient:
         self.session = Session()
         self._verify = self._config.get('verify_cert', True)
 
-        self.url = '{}://{}:{}'.format('https' if self._config['use_ssl'] else 'http', self._config['host'],
-                                       self._config['port']
-                                       )
+        self.url = f"{'https' if self._config['use_ssl'] else 'http'}://{self._config['host']}:{self._config['port']}"
         self.check_api_version('Check API version failed.')
         if self._config.get('username') and self._config.get('password'):
             data = {'username': self._config['username'], 'password': self._config['password']}
@@ -154,7 +148,7 @@ class QBittorrentClient:
             response = self._request(
                 'post',
                 self.url + self.API_URL_ADD_NEW_TORRENT,
-                msg_on_fail='add_torrent_file failed.'.format(file_path),
+                msg_on_fail='add_torrent_file failed.',
                 files=multipart_data,
                 verify=self._verify,
             )
@@ -173,52 +167,42 @@ class QBittorrentClient:
 
     def delete_torrents(self, hashes: str, delete_files) -> None:
         data = {'hashes': hashes, 'deleteFiles': delete_files}
-        if self._check_action('delete_torrents', hashes):
-            self._request(
-                'post',
-                self.url + self.API_URL_DELETE_TORRENTS,
-                data=data,
-                msg_on_fail='delete_torrents failed.',
-                verify=self._verify,
-            )
+        self._request(
+            'post',
+            self.url + self.API_URL_DELETE_TORRENTS,
+            data=data,
+            msg_on_fail='delete_torrents failed.',
+            verify=self._verify,
+        )
+        self._check_action('delete_torrents', hashes)
 
     def recheck_torrents(self, hashes: str) -> None:
         data = {'hashes': hashes}
-        if self._check_action('recheck_torrents', hashes):
-            self._request(
-                'post',
-                self.url + self.API_URL_RECHECK_TORRENTS,
-                data=data,
-                msg_on_fail='recheck_torrents failed.',
-                verify=self._verify,
-            )
+        self._request(
+            'post',
+            self.url + self.API_URL_RECHECK_TORRENTS,
+            data=data,
+            msg_on_fail='recheck_torrents failed.',
+            verify=self._verify,
+        )
+        self._check_action('recheck_torrents', hashes)
 
     def get_torrent_generic_properties(self, torrent_hash) -> dict:
         data = {'hash': torrent_hash}
         return self._request(
-            'post',
+            'get',
             self.url + self.API_URL_GET_TORRENT_GENERIC_PROPERTIES,
-            data=data,
+            params=data,
             msg_on_fail='get_torrent_generic_properties failed.',
             verify=self._verify,
         ).json()
 
-    def get_torrent_pieces_hashes(self, torrent_hash) -> str:
-        data = {'hash': torrent_hash}
-        return self._request(
-            'post',
-            self.url + self.API_URL_GET_TORRENT_PIECES_STATES,
-            data=data,
-            msg_on_fail='get_torrent_pieces_hashes failed.',
-            verify=self._verify,
-        ).text
-
     def get_torrent_trackers(self, torrent_hash) -> dict:
         data = {'hash': torrent_hash}
         response = self._request(
-            'post',
+            'get',
             self.url + self.API_URL_GET_TORRENT_TRACKERS,
-            data=data,
+            params=data,
             msg_on_fail='get_torrent_trackers failed.',
             verify=self._verify
         )
@@ -226,25 +210,25 @@ class QBittorrentClient:
 
     def resume_torrents(self, hashes: str) -> None:
         data = {'hashes': hashes}
-        if self._check_action('resume_torrents', hashes):
-            self._request(
-                'post',
-                self.url + self.API_URL_RESUME,
-                data=data,
-                msg_on_fail='resume_torrents failed.',
-                verify=self._verify,
-            )
+        self._request(
+            'post',
+            self.url + self.API_URL_RESUME,
+            data=data,
+            msg_on_fail='resume_torrents failed.',
+            verify=self._verify,
+        )
+        self._check_action('resume_torrents', hashes)
 
     def pause_torrents(self, hashes: str) -> None:
         data = {'hashes': hashes}
-        if self._check_action('pause_torrents', hashes):
-            self._request(
-                'post',
-                self.url + self.API_URL_PAUSE,
-                data=data,
-                msg_on_fail='pause_torrents failed.',
-                verify=self._verify,
-            )
+        self._request(
+            'post',
+            self.url + self.API_URL_PAUSE,
+            data=data,
+            msg_on_fail='pause_torrents failed.',
+            verify=self._verify,
+        )
+        self._check_action('pause_torrents', hashes)
 
     def edit_trackers(self, torrent_hash: str, origurl: str, newurl: str) -> None:
         data = {'hash': torrent_hash, 'origUrl': origurl, 'newUrl': newurl}
@@ -260,16 +244,16 @@ class QBittorrentClient:
 
     def remove_trackers(self, torrent_hash: str, urls: str) -> None:
         data = {'hash': torrent_hash, 'urls': urls}
-        if self._check_action('edit_trackers', torrent_hash):
-            response = self._request(
-                'post',
-                self.url + self.API_URL_REMOVE_TRACKERS,
-                data=data,
-                msg_on_fail='remove_trackers failed.',
-                verify=self._verify,
-            )
-            if response.status_code == 200:
-                self._update_entry_trackers(torrent_hash)
+        response = self._request(
+            'post',
+            self.url + self.API_URL_REMOVE_TRACKERS,
+            data=data,
+            msg_on_fail='remove_trackers failed.',
+            verify=self._verify,
+        )
+        if response.status_code == 200:
+            self._update_entry_trackers(torrent_hash)
+        self._check_action('edit_trackers', torrent_hash)
 
     def add_torrent_tags(self, hashes: str, tags: str) -> None:
         data = {'hashes': hashes, 'tags': tags}
@@ -286,9 +270,9 @@ class QBittorrentClient:
         data = {'rid': self._rid}
         try:
             main_data = self._request(
-                'post',
+                'get',
                 self.url + self.API_URL_GET_MAIN_DATA,
-                data=data,
+                params=data,
                 msg_on_fail='get_main_data failed.',
                 verify=self._verify,
             ).json()
@@ -300,7 +284,7 @@ class QBittorrentClient:
 
     def get_application_preferences(self) -> dict:
         return self._request(
-            'post',
+            'get',
             self.url + self.API_URL_GET_APPLICATION_PREFERENCES,
             msg_on_fail='get_application_preferences failed.',
             verify=self._verify,
@@ -309,10 +293,10 @@ class QBittorrentClient:
     def set_application_preferences(self, data: str) -> None:
         data = {'json': data}
         self._request(
-            'get',
+            'post',
             self.url + self.API_URL_SET_APPLICATION_PREFERENCES,
-            params=data,
-            msg_on_fail='get_application_preferences failed.',
+            data=data,
+            msg_on_fail='set_application_preferences failed.',
             verify=self._verify,
         )
 
@@ -395,7 +379,7 @@ class QBittorrentClient:
                 return
             save_path = self.save_path_suffix(torrent['save_path'])
             name = torrent['name']
-            save_path_with_name = '{}{}'.format(save_path, name)
+            save_path_with_name = f'{save_path}{name}'
             torrent['save_path_with_name'] = save_path_with_name
             entry = Entry(
                 title=name,

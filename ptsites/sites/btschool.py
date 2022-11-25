@@ -8,6 +8,7 @@ from requests import Response
 
 from ..base.entry import SignInEntry
 from ..base.request import check_network_state, NetworkState
+from ..base.reseed import ReseedPasskey
 from ..base.sign_in import SignState
 from ..base.sign_in import check_final_state
 from ..base.work import Work
@@ -15,7 +16,7 @@ from ..schema.nexusphp import NexusPHP
 from ..utils import net_utils
 
 
-class MainClass(NexusPHP):
+class MainClass(NexusPHP, ReseedPasskey):
     URL: Final = 'https://pt.btschool.club/'
     USER_CLASSES: Final = {
         'downloaded': [1099511627776, 10995116277760],
@@ -39,15 +40,6 @@ class MainClass(NexusPHP):
     def details_selector(self) -> dict:
         selector = super().details_selector
         net_utils.dict_merge(selector, {
-            'detail_sources': {
-                'default': {
-                    'elements': {
-                        # 如果是新用户，父类原来的 table selector 会选择到考核信息的 table，导致无法获取到做种积分信息
-                        # 这个 selector 也许可以放到父类里，更通用
-                        'table': '#outer > table:last-of-type'
-                    }
-                }
-            },
             'details': {
                 'points': {
                     'regex': '做种积分: ([\\d.,]+)',

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib
+import json
 import pathlib
 import pkgutil
+import threading
 
 from flexget import plugin
 from flexget.entry import Entry
@@ -13,6 +15,8 @@ from .base.entry import SignInEntry
 from .base.message import Message
 from .base.reseed import Reseed
 from .base.sign_in import SignIn
+
+lock = threading.Semaphore(1)
 
 
 def build_sign_in_schema() -> dict:
@@ -35,6 +39,25 @@ def build_sign_in_entry(entry: SignInEntry, config: dict) -> None:
             site_class.sign_in_build_entry(entry, config)
     except AttributeError as e:
         raise plugin.PluginError(f"site: {entry['site_name']}, error: {e}")
+
+
+def save_cookie(entry):
+    file_name = 'cookies_backup.json'
+    site_name = entry['site_name']
+    session_cookie = entry.get('session_cookie')
+    if not session_cookie:
+        return
+    with lock:
+        cookies_backup_file = pathlib.Path.cwd().joinpath(file_name)
+        if cookies_backup_file.is_file():
+            cookies_backup_json = json.loads(cookies_backup_file.read_text(encoding='utf-8'))
+        else:
+            cookies_backup_json = {}
+        if cookies_backup_json.get(site_name) != session_cookie:
+            cookies_backup_json[site_name] = session_cookie
+            cookies_backup_file.write_text(
+                json.dumps(cookies_backup_json, indent=4),
+                encoding='utf-8')
 
 
 def sign_in(entry: SignInEntry, config: dict) -> None:
@@ -68,6 +91,11 @@ def sign_in(entry: SignInEntry, config: dict) -> None:
             return
         if entry['details']:
             logger.info(f"site_name: {entry['site_name']}, details: {entry['details']}")
+
+    if config.get('cookie_backup', True):
+        if entry.failed:
+            return
+        save_cookie(entry)
     clean_entry_attr(entry)
 
 
@@ -94,9 +122,10 @@ def build_reseed_entry(entry: Entry, config: dict, site: dict, passkey: str | di
     try:
         site_class = get_site_class(entry['class_name'])
         if issubclass(site_class, Reseed):
-            site_class.reseed_build_entry(entry, config, site, passkey, torrent_id)
+            site_object = site_class()
+            site_object.reseed_build_entry(entry, config, site, passkey, torrent_id)
     except AttributeError as e:
-        raise plugin.PluginError(f"site: {entry['site_name']}, error: {e}")
+        raise plugin.PluginError(f"site: {entry['class_name']}, error: {e}")
 
 
 def get_site_class(class_name: str) -> type:

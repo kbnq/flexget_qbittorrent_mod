@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import itertools
 import json
 import re
 from abc import ABC
 from pathlib import Path
+from time import sleep
 from urllib.parse import urljoin
 
 from flexget.utils.soup import get_soup
@@ -14,7 +17,7 @@ from ..base.request import check_network_state, NetworkState
 from ..base.sign_in import SignState, check_final_state, check_sign_in_state
 from ..base.work import Work
 from ..utils import net_utils
-from ..utils.value_hanlder import handle_infinite
+from ..utils.value_handler import handle_infinite
 
 
 class NexusPHP(PrivateTorrent, ABC):
@@ -31,7 +34,7 @@ class NexusPHP(PrivateTorrent, ABC):
                     'link': '/userdetails.php?id={}',
                     'elements': {
                         'bar': '#info_block > tbody > tr > td > table > tbody > tr > td:nth-child(1) > span',
-                        'table': '#outer table:last-child'
+                        'table': '#outer > table:last-of-type'
                     }
                 }
             },
@@ -152,25 +155,14 @@ class BakatestHR(NexusPHP, ABC):
         if question_element:
             question_id = question_element.get('value')
 
-            local_answer = None
-            question_file = Path.cwd().joinpath('nexusphp_question.json')
+            question_file = Path(__file__).parent.parent.joinpath(f'data/{entry["site_name"]}.json')
+
             if question_file.is_file():
                 question_json = json.loads(question_file.read_text(encoding='utf-8'))
             else:
                 question_json = {}
 
-            question_extend_file = Path(__file__).with_name('nexusphp_question.json')
-            if question_extend_file.is_file():
-                question_extend_json = json.loads(question_extend_file.read_text(encoding='utf-8'))
-                net_utils.dict_merge(question_json, question_extend_json)
-                question_file.write_text(json.dumps(question_json), encoding='utf-8')
-                question_extend_file.unlink()
-
-            site_question = question_json.get(entry['url'])
-            if site_question:
-                local_answer = site_question.get(question_id)
-            else:
-                question_json[entry['url']] = {}
+            local_answer = question_json.get(question_id)
 
             choice_elements = get_soup(last_content).select('input[name="choice[]"]')
             choices = []
@@ -189,7 +181,8 @@ class BakatestHR(NexusPHP, ABC):
                     if list(arr) not in answer_list:
                         answer_list.append(list(arr))
             answer_list.reverse()
-            if local_answer and local_answer in choices and len(local_answer) <= choice_range:
+            if local_answer and len(local_answer) == len([i for i in local_answer if i in choices]) and len(
+                    local_answer) <= choice_range:
                 answer_list.insert(0, local_answer)
             times = 0
             for answer in answer_list:
@@ -198,11 +191,15 @@ class BakatestHR(NexusPHP, ABC):
                 state = check_sign_in_state(entry, work, response, net_utils.decode(response))
                 if state == SignState.SUCCEED:
                     entry['result'] = f"{entry['result']} ( {times} attempts.)"
-                    question_json[entry['url']][question_id] = answer
-                    question_file.write_text(json.dumps(question_json), encoding='utf-8')
+                    if question_json.get(question_id) != answer:
+                        question_json[question_id] = answer
+                        question_file.write_text(
+                            json.dumps({int(x): question_json[x] for x in question_json.keys()}, indent=4),
+                            encoding='utf-8')
                     logger.info(f"{entry['title']}, correct answer: {data}")
                     return
                 times += 1
+                sleep(3)
         entry.fail_with_prefix(SignState.SIGN_IN_FAILED.value.format('No answer.'))
 
 

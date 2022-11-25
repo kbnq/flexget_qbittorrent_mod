@@ -1,30 +1,19 @@
 from typing import Final
 
+from ..base.reseed import ReseedCookie
 from ..schema.nexusphp import AttendanceHR
 from ..utils import net_utils
-from ..utils.net_utils import get_module_name
+from ..utils.value_handler import size
 
 
-class MainClass(AttendanceHR):
+class MainClass(AttendanceHR, ReseedCookie):
     URL: Final = 'https://www.pthome.net/'
     USER_CLASSES: Final = {
-        'downloaded': [1073741824000, 3221225472000],
-        'share_ratio': [6, 9],
+        'downloaded': [size(2, 'TiB'), size(6, 'TiB')],
+        'share_ratio': [1.5, 1.8],
         'points': [600000, 1200000],
         'days': [280, 700]
     }
-
-    @classmethod
-    def reseed_build_schema(cls) -> dict:
-        return {
-            get_module_name(cls): {
-                'type': 'object',
-                'properties': {
-                    'cookie': {'type': 'string'}
-                },
-                'additionalProperties': False
-            }
-        }
 
     @property
     def details_selector(self) -> dict:

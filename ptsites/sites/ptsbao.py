@@ -1,10 +1,11 @@
 from typing import Final
 
+from ..base.reseed import ReseedPasskey
 from ..schema.nexusphp import VisitHR
 from ..utils import net_utils
 
 
-class MainClass(VisitHR):
+class MainClass(VisitHR, ReseedPasskey):
     URL: Final = 'https://ptsbao.club/'
     USER_CLASSES: Final = {
         'downloaded': [805306368000, 3298534883328],
@@ -17,6 +18,12 @@ class MainClass(VisitHR):
         selector = super().details_selector
         net_utils.dict_merge(selector, {
             'details': {
+                'uploaded': {
+                    'regex': r'上传量:  ([\d,.]+ [ZEPTGMK]?B)'
+                },
+                'downloaded': {
+                    'regex': r'下载量:  ([\d,.]+ [ZEPTGMK]?B)'
+                },
                 'points': {
                     'regex': '魔力值.*?：([\\d,.]+)'
                 }
